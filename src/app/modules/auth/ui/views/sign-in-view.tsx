@@ -49,7 +49,8 @@ export const SignInView = () => {
     setPending(true);
 
     authClient.signIn.email(
-      {
+      { 
+  
         email: data.email,
         password: data.password,
         callbackURL: "/",
