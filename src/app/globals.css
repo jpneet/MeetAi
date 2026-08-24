@@ -51,7 +51,8 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  /*primary color */
+  --primary: #0094F7;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -68,14 +69,18 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Sidebar Background color   */
+--sidebar: #075A99;
+--sidebar-foreground: #FFFFFF;
+
+--sidebar-primary: #0094F7;
+--sidebar-primary-foreground: #FFFFFF;
+
+--sidebar-accent: #0A6AAE;
+--sidebar-accent-foreground: #FFFFFF;
+
+--sidebar-border: rgba(0, 148, 247, 0.18);
+--sidebar-ring: #0094F7;
 }
 
 .dark {
