@@ -70,17 +70,17 @@
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   /* Sidebar Background color   */
---sidebar: #075A99;
---sidebar-foreground: #FFFFFF;
+  --sidebar: #075A99;
+  --sidebar-foreground: #FFFFFF;
 
---sidebar-primary: #0094F7;
---sidebar-primary-foreground: #FFFFFF;
+  --sidebar-primary: #0094F7;
+  --sidebar-primary-foreground: #FFFFFF;
 
---sidebar-accent: #0A6AAE;
---sidebar-accent-foreground: #FFFFFF;
+  --sidebar-accent: #0A6AAE;
+  --sidebar-accent-foreground: #FFFFFF;
 
---sidebar-border: rgba(0, 148, 247, 0.18);
---sidebar-ring: #0094F7;
+  --sidebar-border: rgba(0, 148, 247, 0.18);
+  --sidebar-ring: #0094F7;
 }
 
 .dark {
@@ -121,7 +121,16 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer base {
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
   }
 }
