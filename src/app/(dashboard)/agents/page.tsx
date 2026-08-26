@@ -6,9 +6,9 @@ import { getQueryClient, trpc } from "@/trpc/server";
 import {
   AgentsView,
   AgentsViewLoading,
-} from "@/app/modules/agents/ui/views/agents-view";
+} from "@/modules/agents/ui/views/agents-view";
 
-import { AgentsListHeader } from "@/app/modules/agents/ui/components/agents-list-header";
+import { AgentsListHeader } from "@/modules/agents/ui/components/agents-list-header";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";

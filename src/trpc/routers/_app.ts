@@ -1,4 +1,4 @@
-import { agentsRouter } from "@/app/modules/agents/server/procedures";
+import { agentsRouter } from "@/modules/agents/server/procedures";
 
 import { createTRPCRouter } from "../init";
 
