@@ -5,7 +5,7 @@ import { PlusIcon, XCircleIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { NewAgentDialog } from "./new-agent-dialog";
-import { useAgentsFilters } from "../../hooks/use-agents-filters";
+import { useAgentsFilters } from "../../hooks/use-agents-filter";
 import { AgentsSearchFilter } from "./agents-search-filter";
 import { DEFAULT_PAGE } from "@/constants";
 import { ScrollArea } from "radix-ui";
