@@ -1,13 +1,16 @@
-import type { ColumnDef } from "@tanstack/react-table"
-import { AgentGetOne } from "../../types"
-import { type DataTableFeatures } from "./data-table-features"
-import { GeneratedAvatar } from "@/components/generated-avatar"
-import { Badge } from "@/components/ui/badge"
+"use client"
+
+import { ColumnDef } from "@tanstack/react-table"
 import { CornerDownRightIcon, VideoIcon } from "lucide-react"
 
-export const columns: ColumnDef<DataTableFeatures, AgentGetOne>[] = [
+import { Badge } from "@/components/ui/badge"
+import { GeneratedAvatar } from "@/components/generated-avatar"
+
+import { AgentsGetMany } from "../../types"
+
+export const columns: ColumnDef<AgentsGetMany[number]>[] = [
   {
-       accessorKey: "name",
+    accessorKey: "name",
     header: "Agent Name",
     cell: ({ row }) => (
       <div className="flex flex-col gap-y-1">
@@ -31,13 +34,13 @@ export const columns: ColumnDef<DataTableFeatures, AgentGetOne>[] = [
   {
     accessorKey: "meetingCount",
     header: "Meetings",
-    cell: ({row} ) => (
+    cell: ({ row }) => (
       <Badge
         variant="outline"
         className="flex items-center gap-x-2 [&>svg]:size-4"
       >
         <VideoIcon className="text-blue-700" />
-        {row.original.meetingCount} {row.original.meetingCount===1?" meeting" : "meetings"}
+        {row.original.meetingCount} {row.original.meetingCount === 1 ? "meeting" : "meetings"}
       </Badge>
     )
   }
