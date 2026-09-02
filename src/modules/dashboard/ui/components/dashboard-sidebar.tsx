@@ -17,6 +17,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { DashboardUserButton } from "./dashboard-user-button";
 
@@ -43,6 +44,11 @@ const secondSection = [
 
 export const DashboardSidebar = () => {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  const handleNavClick = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   return (
     <Sidebar
@@ -51,6 +57,7 @@ export const DashboardSidebar = () => {
     <Link
       href="/"
       className="flex items-center gap-2 px-2 pt-3"
+      onClick={handleNavClick}
     >
       <Image
         src="/logo.svg"
@@ -87,7 +94,7 @@ export const DashboardSidebar = () => {
                 )}
                 isActive={pathname === item.href}
               >
-                <Link href={item.href}>
+                <Link href={item.href} onClick={handleNavClick}>
                   <item.icon
                     className={cn(
                       "size-5",
@@ -128,7 +135,7 @@ export const DashboardSidebar = () => {
                 )}
                 isActive={pathname === item.href}
               >
-                <Link href={item.href}>
+                <Link href={item.href} onClick={handleNavClick}>
                   <item.icon
                     className={cn(
                       "size-5",
