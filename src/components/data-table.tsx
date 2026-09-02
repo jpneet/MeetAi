@@ -1,7 +1,9 @@
 "use client"
 
 import {
-  useTable,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
   type ColumnDef,
   type RowData,
   type Row,
@@ -16,8 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { DataTableFeatures, features } from "@/modules/agents/ui/components/data-table-features"
 
-import { features, type DataTableFeatures } from "./data-table-features"
 
 interface DataTableProps<TData extends RowData> {
   columns: ColumnDef<DataTableFeatures, TData>[]
@@ -30,10 +32,10 @@ export function DataTable<TData extends RowData>({
   data,
   onRowClick,
 }: DataTableProps<TData>) {
-  const table = useTable({
-    features,
+  const table = useReactTable({
     data,
     columns,
+    getCoreRowModel: getCoreRowModel(),
   })
 
   return (
@@ -41,16 +43,16 @@ export function DataTable<TData extends RowData>({
       <Table>
         <TableBody>
           {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row: Row<DataTableFeatures, TData>) => (
+            table.getRowModel().rows.map((row: Row<TData>) => (
               <TableRow
                 onClick={() => onRowClick?.(row.original)}
                 key={row.id}
                 data-state={row.getIsSelected() && "selected"}
                 className="cursor-pointer"
               >
-                {row.getVisibleCells().map((cell: Cell<DataTableFeatures, TData, unknown>) => (
+                {row.getVisibleCells().map((cell: Cell<TData, unknown>) => (
                   <TableCell key={cell.id} className="text-sm p-4">
-                    <table.FlexRender cell={cell} />
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}
               </TableRow>
