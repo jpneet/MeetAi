@@ -9,7 +9,7 @@ import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from "@
 import { TRPCError } from "@trpc/server";
 
 export const agentsRouter = createTRPCRouter({
-     update: protectedProcedure
+  update: protectedProcedure
     .input(agentsUpdateSchema)
     .mutation(async ({ ctx, input }) => {
       const [updatedAgent] = await db
@@ -32,8 +32,8 @@ export const agentsRouter = createTRPCRouter({
 
       return updatedAgent;
     }),
-    
-    remove: protectedProcedure
+
+  remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const [removedAgent] = await db
@@ -62,7 +62,7 @@ export const agentsRouter = createTRPCRouter({
         id: z.string(),
       })
     )
-    .query(async ({ input ,ctx}) => {
+    .query(async ({ input, ctx }) => {
       const [existingAgent] = await db
         .select({
           meetingCount: sql<number>`5`,
@@ -70,53 +70,48 @@ export const agentsRouter = createTRPCRouter({
         })
         .from(agents)
         .where(
-        and(
-          eq(agents.id, input.id),
-          eq(agents.userId, ctx.auth.user.id),
-        )
-      );
-    if (!existingAgent) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
-    } 
+          and(
+            eq(agents.id, input.id),
+            eq(agents.userId, ctx.auth.user.id),
+          )
+        );
+      if (!existingAgent) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
+      }
       return existingAgent;
     }),
 
   getMany: protectedProcedure
     .input(z.object({
-          page: z.number().default(DEFAULT_PAGE),
-          pageSize: z.number().min(MIN_PAGE_SIZE).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
-          search: z.string().nullish(),
-        })
+      page: z.number().default(DEFAULT_PAGE),
+      pageSize: z.number().min(MIN_PAGE_SIZE).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+      search: z.string().nullish(),
+    })
     )
-    .query(async ({ctx,input}) => {
+    .query(async ({ ctx, input }) => {
       const { search, page, pageSize } = input;
 
-      const data = await db
-        .select({
-          meetingCount: sql<number>`5`,
-          ...getTableColumns(agents),
-        })
-        .from(agents)
-        .where(
-          and(
-            eq(agents.userId, ctx.auth.user.id),
-            search ? ilike(agents.name, `%${search}%`) : undefined,
-          )
-        )
-        .orderBy(desc(agents.createdAt), desc(agents.id))
-        .limit(pageSize)
-        .offset((page - 1) * pageSize)
+      const whereClause = and(
+        eq(agents.userId, ctx.auth.user.id),
+        search ? ilike(agents.name, `%${search}%`) : undefined,
+      );
 
-        
-      const [total] = await db
-        .select({ count: count() })
-        .from(agents)
-        .where(
-          and(
-            eq(agents.userId, ctx.auth.user.id),
-            search ? ilike(agents.name, `%${search}%`) : undefined,
-          )
-        );
+      const [data, [total]] = await Promise.all([
+        db
+          .select({
+            meetingCount: sql<number>`5`,
+            ...getTableColumns(agents),
+          })
+          .from(agents)
+          .where(whereClause)
+          .orderBy(desc(agents.createdAt), desc(agents.id))
+          .limit(pageSize)
+          .offset((page - 1) * pageSize),
+        db
+          .select({ count: count() })
+          .from(agents)
+          .where(whereClause),
+      ]);
 
       const totalPages = Math.ceil(total.count / pageSize);
       return {
