@@ -121,29 +121,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const call = streamVideo.video.call("default", meetingId);
-    console.log("[WEBHOOK] Connecting AI agent:", existingAgent.id, "to call:", call.cid);
+    const visionAgentUrl = process.env.VISION_AGENT_URL || "http://127.0.0.1:8080";
+    console.log(`[WEBHOOK] Requesting Vision Agent at ${visionAgentUrl} for meeting: ${meetingId}`);
 
     try {
-      const realtimeClient = await streamVideo.video.connectOpenAi({
-        call,
-        openAiApiKey: process.env.OPENAI_API_KEY!,
-        agentUserId: existingAgent.id,
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const agentRes = await fetch(`${visionAgentUrl}/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          callType: "default",
+          callId: meetingId,
+          agentId: existingAgent.id,
+          agentName: existingAgent.name,
+          instructions: existingAgent.instructions,
+        }),
+        signal: controller.signal,
       });
 
-      console.log("[WEBHOOK] AI agent connected successfully");
+      clearTimeout(timeoutId);
 
-      realtimeClient.updateSession({
-        instructions: existingAgent.instructions,
-      });
+      const agentData = await agentRes.json().catch(() => ({}));
+      console.log("[WEBHOOK] Vision Agent response:", agentRes.status, agentData);
 
-      console.log("[WEBHOOK] Session instructions applied");
+      if (!agentRes.ok) {
+        console.error("[WEBHOOK] Vision Agent returned non-OK status:", agentRes.status, agentData);
+      }
     } catch (err) {
-      console.error("[WEBHOOK] ERROR connecting AI agent:", err);
-      return NextResponse.json(
-        { error: "Failed to connect AI agent", details: String(err) },
-        { status: 500 }
-      );
+      console.error("[WEBHOOK] Could not connect to Vision Agent service (is it running on port 8080?):", err);
     }
 
     return NextResponse.json({ status: "ok" });
