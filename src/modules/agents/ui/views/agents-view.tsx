@@ -34,7 +34,7 @@ export const AgentsView = () => {
         <>
           <DataTable 
           data={data.items} 
-          columns={columns as any}
+          columns={columns}
           onRowClick={(row) => router.push(`/agents/${row.id}`)}
           />
 
