@@ -16,7 +16,7 @@ export const CallUI = ({ meetingName }: Props) => {
   const handleJoin = async () => {
     if (!call) return;
 
-    await call.join();
+    await call.join({ create: true });
 
     setShow("call");
   };
