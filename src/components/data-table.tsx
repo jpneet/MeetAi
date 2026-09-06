@@ -14,24 +14,20 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
-  TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { DataTableFeatures, features } from "@/modules/agents/ui/components/data-table-features"
 
-
-interface DataTableProps<TData extends RowData> {
-  columns: ColumnDef<DataTableFeatures, TData>[]
+interface DataTableProps<TData extends RowData, TValue = unknown> {
+  columns: ColumnDef<TData, TValue>[]
   data: TData[]
   onRowClick?:(row:TData)=>void;
 }
 
-export function DataTable<TData extends RowData>({
+export function DataTable<TData extends RowData, TValue = unknown>({
   columns,
   data,
   onRowClick,
-}: DataTableProps<TData>) {
+}: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
     columns,

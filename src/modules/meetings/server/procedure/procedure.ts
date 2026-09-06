@@ -2,7 +2,7 @@ import { z } from "zod";
 import { eq, sql, getTableColumns, and, ilike, desc, count } from "drizzle-orm";
 
 import { db } from "@/db";
-import { agents, meetings } from "@/db/schema";
+import { agents, meetings, user } from "@/db/schema";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from "@/constants";
 import { TRPCError } from "@trpc/server";
@@ -10,6 +10,7 @@ import { meetingsInsertSchema, meetingsUpdateSchema } from "../../schemas";
 import { MeetingStatus } from "../../types";
 import { streamVideo } from "@/lib/stream-video";
 import { generateAvatarUri } from "@/lib/avatar";
+import { parseTranscriptItems } from "@/inngest/transcript-parser";
 
 export const meetingsRouter = createTRPCRouter({
 
@@ -230,6 +231,78 @@ export const meetingsRouter = createTRPCRouter({
         total: total.count,
         totalPages,
       };
+    }),
+
+  getTranscript: protectedProcedure
+    .input(
+      z.object({
+        meetingId: z.string(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const [existingMeeting] = await db
+        .select({
+          ...getTableColumns(meetings),
+          agent: agents,
+          user: user,
+        })
+        .from(meetings)
+        .innerJoin(agents, eq(meetings.agentId, agents.id))
+        .innerJoin(user, eq(meetings.userId, user.id))
+        .where(
+          and(
+            eq(meetings.id, input.meetingId),
+            eq(meetings.userId, ctx.auth.user.id),
+          )
+        );
+
+      if (!existingMeeting) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Meeting not found",
+        });
+      }
+
+      if (!existingMeeting.transcriptUrl) {
+        return {
+          transcriptUrl: null,
+          items: [],
+        };
+      }
+
+      const speakerMap: Record<string, string> = {
+        [existingMeeting.agent.id]: existingMeeting.agent.name,
+        [existingMeeting.agentId]: existingMeeting.agent.name,
+        [existingMeeting.user.id]: existingMeeting.user.name,
+        [existingMeeting.userId]: existingMeeting.user.name,
+        [ctx.auth.user.id]: existingMeeting.user.name || ctx.auth.user.name,
+        agent: existingMeeting.agent.name,
+        assistant: existingMeeting.agent.name,
+        bot: existingMeeting.agent.name,
+        ai: existingMeeting.agent.name,
+        user: existingMeeting.user.name,
+        participant: existingMeeting.user.name,
+      };
+
+      try {
+        const res = await fetch(existingMeeting.transcriptUrl);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch transcript: ${res.status} ${res.statusText}`);
+        }
+        const rawText = await res.text();
+        const items = parseTranscriptItems(rawText, speakerMap);
+
+        return {
+          transcriptUrl: existingMeeting.transcriptUrl,
+          items,
+        };
+      } catch (err) {
+        console.error("Error fetching transcript:", err);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch or parse transcript data",
+        });
+      }
     }),
 
 });

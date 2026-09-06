@@ -38,7 +38,7 @@ export const MeetingsView = () => {
     <div className="flex-1 px-4 pb-4 md:px-8 flex flex-col gap-y-4">
       <DataTable
         data={data.items}
-        columns={columns as any}
+        columns={columns}
         onRowClick={(row) => router.push(`/meetings/${row.id}`)}
       />
 

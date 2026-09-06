@@ -2,13 +2,18 @@ import { eq, not, and } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
+  CallEndedEvent,
+  CallRecordingReadyEvent,
+  CallSessionEndedEvent,
   CallSessionParticipantLeftEvent,
   CallSessionStartedEvent,
+  CallTranscriptionReadyEvent,
 } from "@stream-io/node-sdk";
 
 import { db } from "@/db";
 import { agents, meetings } from "@/db/schema";
 import { streamVideo } from "@/lib/stream-video";
+import { inngest } from "@/inngest/client";
 
 export async function POST(req: NextRequest) {
   console.log("[WEBHOOK] Incoming request");
@@ -100,11 +105,11 @@ export async function POST(req: NextRequest) {
       .update(meetings)
       .set({
         status: "active",
-        startedAt: new Date(),
+        startedAt: existingMeeting.startedAt ?? new Date(),
       })
       .where(eq(meetings.id, existingMeeting.id));
 
-    console.log("[WEBHOOK] Meeting status updated to active");
+    console.log(`[Meeting Lifecycle] ACTIVE: Meeting ${meetingId} status set to active`);
 
     const [existingAgent] = await db
       .select()
@@ -157,9 +162,12 @@ export async function POST(req: NextRequest) {
 
   } else if (eventType === "call.session_participant_left") {
     const event = payload as unknown as CallSessionParticipantLeftEvent;
-    const meetingId = event.call_cid.split(":")[1];
+    const meetingId =
+      event.call_cid?.split(":")[1] ||
+      ((payload as { call?: { custom?: { meetingId?: string } } }).call?.custom?.meetingId);
 
-    console.log("[WEBHOOK] Participant left, meeting ID:", meetingId);
+    const participantId = event.participant?.user?.id ?? "unknown";
+    console.log(`[Meeting Lifecycle] Participant left: ${participantId} from meeting: ${meetingId}. Call/session is still running — meeting remains ACTIVE.`);
 
     if (!meetingId) {
       return NextResponse.json(
@@ -167,6 +175,200 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // DO NOT mark the meeting as processing.
+    // DO NOT mark the meeting as completed.
+    // DO NOT end the meeting.
+    // The meeting must remain ACTIVE while the call/session is still running.
+    return NextResponse.json({ status: "ok" });
+
+  } else if (eventType === "call.session_ended" || eventType === "call.ended") {
+    const event = payload as unknown as (CallSessionEndedEvent | CallEndedEvent);
+    const meetingId =
+      event.call_cid?.split(":")[1] ||
+      (event.call?.custom as { meetingId?: string } | undefined)?.meetingId;
+
+    console.log(`[Meeting Lifecycle] Call session ended for meeting ID: ${meetingId}`);
+
+    if (!meetingId) {
+      console.log("[WEBHOOK] Missing meetingId in session_ended — returning 400");
+      return NextResponse.json(
+        { error: "Missing meetingId" },
+        { status: 400 }
+      );
+    }
+
+    const [existingMeeting] = await db
+      .select()
+      .from(meetings)
+      .where(eq(meetings.id, meetingId));
+
+    if (existingMeeting) {
+      // Transition meeting to processing (unless already in terminal status)
+      // Do NOT mark it completed immediately. Do NOT mark it cancelled.
+      const nextStatus =
+        existingMeeting.status === "completed" || existingMeeting.status === "cancelled"
+          ? existingMeeting.status
+          : "processing";
+
+      const [updatedMeeting] = await db
+        .update(meetings)
+        .set({
+          status: nextStatus,
+          endedAt: existingMeeting.endedAt ?? new Date(),
+        })
+        .where(eq(meetings.id, existingMeeting.id))
+        .returning();
+
+      if (nextStatus === "processing") {
+        console.log(`[Meeting Lifecycle] PROCESSING: Meeting ${meetingId} status set to processing`);
+      }
+
+      // Handle Scenario B (call.transcription_ready arrived BEFORE call.session_ended):
+      // If transcriptUrl is already present and meeting transitioned to processing, trigger Inngest now!
+      if (updatedMeeting.status === "processing" && updatedMeeting.transcriptUrl) {
+        console.log(`[Meeting Lifecycle] Transcript already available for meeting ${meetingId} (Scenario B) — triggering Inngest processing`);
+        try {
+          await inngest.send({
+            name: "meetings/processing",
+            data: {
+              meetingId: updatedMeeting.id,
+              transcriptUrl: updatedMeeting.transcriptUrl,
+            },
+          });
+          console.log(`[Meeting Lifecycle] Inngest processing event sent for meeting: ${meetingId}`);
+        } catch (inngestErr) {
+          console.error("[WEBHOOK] Error sending Inngest event meetings/processing:", inngestErr);
+          return NextResponse.json(
+            { error: "Failed to send Inngest event", details: String(inngestErr) },
+            { status: 500 }
+          );
+        }
+      }
+    } else {
+      console.log("[WEBHOOK] Meeting not found for session_ended:", meetingId);
+    }
+
+    return NextResponse.json({ status: "ok" });
+
+  } else if (eventType === "call.transcription_ready") {
+    const event = payload as unknown as CallTranscriptionReadyEvent;
+    const meetingId = event.call_cid?.split(":")[1];
+    const transcriptUrl = event.call_transcription?.url;
+
+    console.log(`[Meeting Lifecycle] Transcript ready for meeting ID: ${meetingId}, URL: ${transcriptUrl}`);
+
+    if (!meetingId) {
+      return NextResponse.json(
+        { error: "Missing meetingId" },
+        { status: 400 }
+      );
+    }
+
+    if (!transcriptUrl) {
+      return NextResponse.json(
+        { error: "Missing transcriptUrl" },
+        { status: 400 }
+      );
+    }
+
+    const [existingMeeting] = await db
+      .select()
+      .from(meetings)
+      .where(eq(meetings.id, meetingId));
+
+    if (!existingMeeting) {
+      console.log("[WEBHOOK] Meeting not found for transcription_ready:", meetingId);
+      return NextResponse.json(
+        { error: "Meeting not found" },
+        { status: 404 }
+      );
+    }
+
+    // Save the transcript URL.
+    // If meeting is already in "processing" (Scenario A: session_ended arrived first),
+    // keep status "processing" and trigger Inngest.
+    // If meeting is still "active" (Scenario B: transcription_ready arrived first),
+    // keep status "active" (preserving call session) and save transcriptUrl.
+    // session_ended will trigger Inngest when the call finishes.
+    const isCallEnded =
+      existingMeeting.status === "processing" ||
+      existingMeeting.endedAt !== null;
+
+    const nextStatus =
+      existingMeeting.status === "completed" || existingMeeting.status === "cancelled"
+        ? existingMeeting.status
+        : isCallEnded
+        ? "processing"
+        : existingMeeting.status;
+
+    const [updatedMeeting] = await db
+      .update(meetings)
+      .set({
+        transcriptUrl,
+        status: nextStatus,
+      })
+      .where(eq(meetings.id, meetingId))
+      .returning();
+
+    console.log(`[WEBHOOK] Meeting ${meetingId} transcriptUrl saved. Status: ${updatedMeeting.status}`);
+
+    // If meeting is in "processing", trigger Inngest (Scenario A)
+    if (updatedMeeting.status === "processing") {
+      try {
+        await inngest.send({
+          name: "meetings/processing",
+          data: {
+            meetingId: updatedMeeting.id,
+            transcriptUrl: updatedMeeting.transcriptUrl!,
+          },
+        });
+
+        console.log(`[Meeting Lifecycle] Inngest processing event sent for meeting: ${updatedMeeting.id}`);
+      } catch (inngestErr) {
+        console.error("[WEBHOOK] Error sending Inngest event meetings/processing:", inngestErr);
+        return NextResponse.json(
+          { error: "Failed to send Inngest event", details: String(inngestErr) },
+          { status: 500 }
+        );
+      }
+    } else {
+      console.log(`[Meeting Lifecycle] Call is still in status '${updatedMeeting.status}'. Transcript URL saved. Waiting for call.session_ended to trigger Inngest.`);
+    }
+
+    return NextResponse.json({ status: "ok" });
+
+  } else if (eventType === "call.recording_ready") {
+    const event = payload as unknown as CallRecordingReadyEvent;
+    const meetingId = event.call_cid?.split(":")[1];
+    const recordingUrl = event.call_recording?.url;
+
+    console.log("[WEBHOOK] Recording ready for meeting ID:", meetingId, "URL:", recordingUrl);
+
+    if (!meetingId) {
+      return NextResponse.json(
+        { error: "Missing meetingId" },
+        { status: 400 }
+      );
+    }
+
+    const [updatedMeeting] = await db
+      .update(meetings)
+      .set({
+        recordingUrl,
+      })
+      .where(eq(meetings.id, meetingId))
+      .returning();
+
+    if (!updatedMeeting) {
+      console.log("[WEBHOOK] Meeting not found for recording_ready:", meetingId);
+      return NextResponse.json(
+        { error: "Meeting not found" },
+        { status: 404 }
+      );
+    }
+
+    console.log("[WEBHOOK] Meeting recordingUrl updated:", updatedMeeting.id);
 
     return NextResponse.json({ status: "ok" });
   }

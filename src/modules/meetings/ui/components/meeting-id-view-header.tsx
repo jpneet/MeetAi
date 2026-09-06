@@ -32,19 +32,19 @@ export const MeetingIdViewHeader = ({
   return (
     <div className="flex items-center justify-between">
       <Breadcrumb>
-        <BreadcrumbList>
+        <BreadcrumbList className="text-sm sm:text-base">
           <BreadcrumbItem>
-            <BreadcrumbLink asChild className="font-medium text-xl">
+            <BreadcrumbLink asChild className="font-medium text-muted-foreground hover:text-foreground">
               <Link href="/meetings">
                 My Meetings
               </Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
-          <BreadcrumbSeparator className="text-foreground text-xl font-medium [&>svg]:size-4">
+          <BreadcrumbSeparator className="text-muted-foreground [&>svg]:size-3.5">
             <ChevronRightIcon />
           </BreadcrumbSeparator>
           <BreadcrumbItem>
-            <BreadcrumbLink asChild className="font-medium text-xl text-foreground">
+            <BreadcrumbLink asChild className="font-semibold text-foreground truncate max-w-[200px] sm:max-w-md">
               <Link href={`/meetings/${meetingId}`}>
                 {meetingName}
               </Link>
@@ -55,17 +55,17 @@ export const MeetingIdViewHeader = ({
       {/* Without modal={false}, the dialog that this dropdown opens cause the website to get unclickable */}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost">
-            <MoreVerticalIcon />
+          <Button variant="ghost" size="icon">
+            <MoreVerticalIcon className="size-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={onEdit}>
-            <PencilIcon className="size-4 text-black" />
+            <PencilIcon className="size-4 mr-2" />
             Edit
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={onRemove}>
-            <TrashIcon className="size-4 text-black" />
+          <DropdownMenuItem onClick={onRemove} className="text-destructive focus:text-destructive">
+            <TrashIcon className="size-4 mr-2" />
             Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
