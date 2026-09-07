@@ -13,7 +13,6 @@ import {
 import { db } from "@/db";
 import { agents, meetings } from "@/db/schema";
 import { streamVideo } from "@/lib/stream-video";
-import { inngest } from "@/inngest/client";
 
 export async function POST(req: NextRequest) {
   console.log("[WEBHOOK] Incoming request");
@@ -204,47 +203,21 @@ export async function POST(req: NextRequest) {
       .where(eq(meetings.id, meetingId));
 
     if (existingMeeting) {
-      // Transition meeting to processing (unless already in terminal status)
-      // Do NOT mark it completed immediately. Do NOT mark it cancelled.
+      // Transition meeting to completed (unless already cancelled)
       const nextStatus =
-        existingMeeting.status === "completed" || existingMeeting.status === "cancelled"
+        existingMeeting.status === "cancelled"
           ? existingMeeting.status
-          : "processing";
+          : "completed";
 
-      const [updatedMeeting] = await db
+      await db
         .update(meetings)
         .set({
           status: nextStatus,
           endedAt: existingMeeting.endedAt ?? new Date(),
         })
-        .where(eq(meetings.id, existingMeeting.id))
-        .returning();
+        .where(eq(meetings.id, existingMeeting.id));
 
-      if (nextStatus === "processing") {
-        console.log(`[Meeting Lifecycle] PROCESSING: Meeting ${meetingId} status set to processing`);
-      }
-
-      // Handle Scenario B (call.transcription_ready arrived BEFORE call.session_ended):
-      // If transcriptUrl is already present and meeting transitioned to processing, trigger Inngest now!
-      if (updatedMeeting.status === "processing" && updatedMeeting.transcriptUrl) {
-        console.log(`[Meeting Lifecycle] Transcript already available for meeting ${meetingId} (Scenario B) — triggering Inngest processing`);
-        try {
-          await inngest.send({
-            name: "meetings/processing",
-            data: {
-              meetingId: updatedMeeting.id,
-              transcriptUrl: updatedMeeting.transcriptUrl,
-            },
-          });
-          console.log(`[Meeting Lifecycle] Inngest processing event sent for meeting: ${meetingId}`);
-        } catch (inngestErr) {
-          console.error("[WEBHOOK] Error sending Inngest event meetings/processing:", inngestErr);
-          return NextResponse.json(
-            { error: "Failed to send Inngest event", details: String(inngestErr) },
-            { status: 500 }
-          );
-        }
-      }
+      console.log(`[Meeting Lifecycle] COMPLETED: Meeting ${meetingId} status set to ${nextStatus}`);
     } else {
       console.log("[WEBHOOK] Meeting not found for session_ended:", meetingId);
     }
@@ -285,56 +258,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Save the transcript URL.
-    // If meeting is already in "processing" (Scenario A: session_ended arrived first),
-    // keep status "processing" and trigger Inngest.
-    // If meeting is still "active" (Scenario B: transcription_ready arrived first),
-    // keep status "active" (preserving call session) and save transcriptUrl.
-    // session_ended will trigger Inngest when the call finishes.
-    const isCallEnded =
-      existingMeeting.status === "processing" ||
-      existingMeeting.endedAt !== null;
-
-    const nextStatus =
-      existingMeeting.status === "completed" || existingMeeting.status === "cancelled"
-        ? existingMeeting.status
-        : isCallEnded
-        ? "processing"
-        : existingMeeting.status;
-
-    const [updatedMeeting] = await db
+    // Save the transcript URL so it is available for viewing in the Transcript tab.
+    await db
       .update(meetings)
       .set({
         transcriptUrl,
-        status: nextStatus,
       })
-      .where(eq(meetings.id, meetingId))
-      .returning();
+      .where(eq(meetings.id, meetingId));
 
-    console.log(`[WEBHOOK] Meeting ${meetingId} transcriptUrl saved. Status: ${updatedMeeting.status}`);
-
-    // If meeting is in "processing", trigger Inngest (Scenario A)
-    if (updatedMeeting.status === "processing") {
-      try {
-        await inngest.send({
-          name: "meetings/processing",
-          data: {
-            meetingId: updatedMeeting.id,
-            transcriptUrl: updatedMeeting.transcriptUrl!,
-          },
-        });
-
-        console.log(`[Meeting Lifecycle] Inngest processing event sent for meeting: ${updatedMeeting.id}`);
-      } catch (inngestErr) {
-        console.error("[WEBHOOK] Error sending Inngest event meetings/processing:", inngestErr);
-        return NextResponse.json(
-          { error: "Failed to send Inngest event", details: String(inngestErr) },
-          { status: 500 }
-        );
-      }
-    } else {
-      console.log(`[Meeting Lifecycle] Call is still in status '${updatedMeeting.status}'. Transcript URL saved. Waiting for call.session_ended to trigger Inngest.`);
-    }
+    console.log(`[WEBHOOK] Meeting ${meetingId} transcriptUrl saved.`);
 
     return NextResponse.json({ status: "ok" });
 
