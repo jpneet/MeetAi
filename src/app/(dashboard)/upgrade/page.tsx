@@ -6,18 +6,13 @@ import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 
 import { auth } from "@/lib/auth";
 import { getQueryClient, trpc } from "@/trpc/server";
-import { MeetingIdView, MeetingIdViewError, MeetingIdViewLoading } from "@/modules/meetings/ui/views/meeting-id-view";
+import {
+  UpgradeView,
+  UpgradeViewError,
+  UpgradeViewLoading,
+} from "@/modules/premium/ui/views/upgrade-view";
 
-
-interface Props {
-  params: Promise<{
-    meetingId: string;
-  }>;
-}
-
-const Page = async ({ params }: Props) => {
-  const { meetingId } = await params;
-
+const Page = async () => {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -27,19 +22,22 @@ const Page = async ({ params }: Props) => {
   }
 
   const queryClient = getQueryClient();
-  await queryClient.prefetchQuery(
-    trpc.meetings.getOne.queryOptions({ id: meetingId }),
-  );
-
-  return (
+  void queryClient.prefetchQuery(
+    trpc.premium.getCurrentSubscription.queryOptions(),
+  )
+  void queryClient.prefetchQuery(
+    trpc.premium.getProducts.queryOptions(),
+  )
+  
+  return ( 
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <Suspense fallback={<MeetingIdViewLoading />}>
-        <ErrorBoundary fallback={<MeetingIdViewError />}>
-          <MeetingIdView meetingId={meetingId} />
+      <Suspense fallback={<UpgradeViewLoading />}>
+        <ErrorBoundary fallback={<UpgradeViewError />}>
+          <UpgradeView />
         </ErrorBoundary>
       </Suspense>
     </HydrationBoundary>
-  );
+   );
 }
-
+ 
 export default Page;

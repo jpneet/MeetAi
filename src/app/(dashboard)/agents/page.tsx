@@ -1,9 +1,10 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { Suspense } from "react";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SearchParams } from "nuqs";
 
-import { getSession } from "@/trpc/init";
+import { auth } from "@/lib/auth";
 import { getQueryClient, trpc } from "@/trpc/server";
 
 import {
@@ -20,7 +21,9 @@ interface Props {
 
 const Page = async ({ searchParams }: Props) => {
   const filters = await loadSearchParams(searchParams);
-  const session = await getSession();
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
 
   if (!session) {
     redirect("/sign-in");

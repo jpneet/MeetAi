@@ -44,7 +44,7 @@ export const MeetingIdViewHeader = ({
             <ChevronRightIcon />
           </BreadcrumbSeparator>
           <BreadcrumbItem>
-            <BreadcrumbLink asChild className="font-semibold text-foreground truncate max-w-[200px] sm:max-w-md">
+            <BreadcrumbLink asChild className="font-semibold text-foreground truncate max-w-50 sm:max-w-md">
               <Link href={`/meetings/${meetingId}`}>
                 {meetingName}
               </Link>
