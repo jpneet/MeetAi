@@ -175,6 +175,26 @@ export const meetingsRouter = createTRPCRouter({
         });
       }
 
+      if (!existingMeeting.recordingUrl) {
+        try {
+          const call = streamVideo.video.call("default", input.id);
+          const { recordings } = await call.listRecordings();
+          const sorted = recordings.sort(
+            (a, b) =>
+              new Date(b.end_time).getTime() - new Date(a.end_time).getTime()
+          );
+          if (sorted.length > 0 && sorted[0].url) {
+            existingMeeting.recordingUrl = sorted[0].url;
+            await db
+              .update(meetings)
+              .set({ recordingUrl: sorted[0].url })
+              .where(eq(meetings.id, input.id));
+          }
+        } catch (err) {
+          console.error("Error fetching recording from Stream in getOne:", err);
+        }
+      }
+
       return existingMeeting;
     }),
 
