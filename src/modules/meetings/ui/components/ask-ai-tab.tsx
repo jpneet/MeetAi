@@ -12,7 +12,7 @@ interface Props {
 const suggestedPrompts = [
   "What were the primary decisions made in this call?",
   "List all action items and responsible assignees",
-  "Summarize key challenges or unresolved questions",
+  "What were the key challenges or unresolved questions?",
   "What was the main outcome of the discussion?",
 ];
 
@@ -79,7 +79,7 @@ export const AskAiTab = ({ meetingName }: Props) => {
 
         <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-900 dark:text-blue-200 flex items-center justify-between gap-2">
           <span>
-            Meeting AI chat backend integration is currently in progress. The AI-generated overview, structured notes, and full transcript are available in the <strong>Summary</strong> and <strong>Transcript</strong> tabs.
+            Meeting AI chat backend integration is currently in progress. The full transcript and call recording are available in the <strong>Transcript</strong> and <strong>Recording</strong> tabs.
           </span>
         </div>
       </div>

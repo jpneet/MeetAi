@@ -13,7 +13,8 @@ import {
 import { db } from "@/db";
 import { agents, meetings } from "@/db/schema";
 import { streamVideo } from "@/lib/stream-video";
-import { inngest } from "@/inngest/client";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   console.log("[WEBHOOK] Incoming request");
@@ -35,14 +36,21 @@ export async function POST(req: NextRequest) {
   }
 
   // Read the raw bytes BEFORE any decompression.
-  // req.text() causes Next.js to decompress gzip payloads transparently,
-  // which means verifyWebhook() would compute HMAC over the decompressed
-  // string while Stream computed it over the original gzip bytes → mismatch.
-  // req.arrayBuffer() returns the untouched wire bytes.
+  // req.text() causes Next.js to decompress gzip payloads transparently or
+  // decode them as UTF-8, which corrupts binary sequences and causes signature mismatch.
+  // req.arrayBuffer() preserves the exact untouched wire bytes.
   const rawBytes = await req.arrayBuffer();
   const rawBody = Buffer.from(rawBytes);
 
   console.log("[WEBHOOK] Body byte length:", rawBody.length);
+
+  if (rawBody.length === 0) {
+    console.log("[WEBHOOK] Request body is empty (0 bytes) — returning 400");
+    return NextResponse.json(
+      { error: "Empty request body" },
+      { status: 400 }
+    );
+  }
 
   // verifyAndParseWebhook handles gzip detection, decompression, HMAC
   // verification, and JSON parsing in a single call.
@@ -204,12 +212,10 @@ export async function POST(req: NextRequest) {
       .where(eq(meetings.id, meetingId));
 
     if (existingMeeting) {
-      // Transition meeting to processing (unless already in terminal status)
-      // Do NOT mark it completed immediately. Do NOT mark it cancelled.
       const nextStatus =
         existingMeeting.status === "completed" || existingMeeting.status === "cancelled"
           ? existingMeeting.status
-          : "processing";
+          : "completed";
 
       const [updatedMeeting] = await db
         .update(meetings)
@@ -220,31 +226,7 @@ export async function POST(req: NextRequest) {
         .where(eq(meetings.id, existingMeeting.id))
         .returning();
 
-      if (nextStatus === "processing") {
-        console.log(`[Meeting Lifecycle] PROCESSING: Meeting ${meetingId} status set to processing`);
-      }
-
-      // Handle Scenario B (call.transcription_ready arrived BEFORE call.session_ended):
-      // If transcriptUrl is already present and meeting transitioned to processing, trigger Inngest now!
-      if (updatedMeeting.status === "processing" && updatedMeeting.transcriptUrl) {
-        console.log(`[Meeting Lifecycle] Transcript already available for meeting ${meetingId} (Scenario B) — triggering Inngest processing`);
-        try {
-          await inngest.send({
-            name: "meetings/processing",
-            data: {
-              meetingId: updatedMeeting.id,
-              transcriptUrl: updatedMeeting.transcriptUrl,
-            },
-          });
-          console.log(`[Meeting Lifecycle] Inngest processing event sent for meeting: ${meetingId}`);
-        } catch (inngestErr) {
-          console.error("[WEBHOOK] Error sending Inngest event meetings/processing:", inngestErr);
-          return NextResponse.json(
-            { error: "Failed to send Inngest event", details: String(inngestErr) },
-            { status: 500 }
-          );
-        }
-      }
+      console.log(`[Meeting Lifecycle] COMPLETED: Meeting ${meetingId} status set to ${updatedMeeting.status}`);
     } else {
       console.log("[WEBHOOK] Meeting not found for session_ended:", meetingId);
     }
@@ -286,20 +268,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Save the transcript URL.
-    // If meeting is already in "processing" (Scenario A: session_ended arrived first),
-    // keep status "processing" and trigger Inngest.
-    // If meeting is still "active" (Scenario B: transcription_ready arrived first),
-    // keep status "active" (preserving call session) and save transcriptUrl.
-    // session_ended will trigger Inngest when the call finishes.
+    // If the call has already ended, mark as completed (if not already completed/cancelled).
+    // If the call is still active, keep active and save transcriptUrl.
     const isCallEnded =
-      existingMeeting.status === "processing" ||
+      existingMeeting.status === "completed" ||
       existingMeeting.endedAt !== null;
 
     const nextStatus =
       existingMeeting.status === "completed" || existingMeeting.status === "cancelled"
         ? existingMeeting.status
         : isCallEnded
-        ? "processing"
+        ? "completed"
         : existingMeeting.status;
 
     const [updatedMeeting] = await db
@@ -312,29 +291,6 @@ export async function POST(req: NextRequest) {
       .returning();
 
     console.log(`[WEBHOOK] Meeting ${meetingId} transcriptUrl saved. Status: ${updatedMeeting.status}`);
-
-    // If meeting is in "processing", trigger Inngest (Scenario A)
-    if (updatedMeeting.status === "processing") {
-      try {
-        await inngest.send({
-          name: "meetings/processing",
-          data: {
-            meetingId: updatedMeeting.id,
-            transcriptUrl: updatedMeeting.transcriptUrl!,
-          },
-        });
-
-        console.log(`[Meeting Lifecycle] Inngest processing event sent for meeting: ${updatedMeeting.id}`);
-      } catch (inngestErr) {
-        console.error("[WEBHOOK] Error sending Inngest event meetings/processing:", inngestErr);
-        return NextResponse.json(
-          { error: "Failed to send Inngest event", details: String(inngestErr) },
-          { status: 500 }
-        );
-      }
-    } else {
-      console.log(`[Meeting Lifecycle] Call is still in status '${updatedMeeting.status}'. Transcript URL saved. Waiting for call.session_ended to trigger Inngest.`);
-    }
 
     return NextResponse.json({ status: "ok" });
 

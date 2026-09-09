@@ -42,21 +42,6 @@ function parseTime(val: unknown): number | undefined {
   return undefined;
 }
 
-function formatSpeakerName(item: TranscriptSegment, speakerMap?: Record<string, string>): string {
-  let raw = "";
-  if (typeof item.user === "object" && item.user?.name) {
-    raw = item.user.name;
-  } else if (typeof item.user === "object" && item.user?.id) {
-    raw = item.user.id;
-  } else if (typeof item.user === "string") {
-    raw = item.user;
-  } else {
-    raw = item.speaker || item.speaker_id || item.name || "Speaker";
-  }
-
-  return resolveSpeakerName(raw, speakerMap);
-}
-
 function resolveSpeakerName(raw: string, speakerMap?: Record<string, string>): string {
   if (!speakerMap || !raw) return raw || "Speaker";
 
@@ -79,13 +64,27 @@ function resolveSpeakerName(raw: string, speakerMap?: Record<string, string>): s
 
   // 4. Keyword heuristics
   if (lowerRaw.includes("agent") || lowerRaw.includes("assistant") || lowerRaw.includes("bot") || lowerRaw.includes("ai")) {
-    // If there's an agent in the map, return it
     for (const [id, name] of Object.entries(speakerMap)) {
       if (id.startsWith("agent:") || lowerRaw.includes(name.toLowerCase())) return name;
     }
   }
 
   return raw;
+}
+
+function formatSpeakerName(item: TranscriptSegment, speakerMap?: Record<string, string>): string {
+  let raw = "";
+  if (typeof item.user === "object" && item.user?.name) {
+    raw = item.user.name;
+  } else if (typeof item.user === "object" && item.user?.id) {
+    raw = item.user.id;
+  } else if (typeof item.user === "string") {
+    raw = item.user;
+  } else {
+    raw = item.speaker || item.speaker_id || item.name || "Speaker";
+  }
+
+  return resolveSpeakerName(raw, speakerMap);
 }
 
 function formatSegmentText(item: TranscriptSegment): string {
@@ -268,13 +267,4 @@ export function parseTranscriptItems(
   }
 
   return plainItems;
-}
-
-export function parseTranscript(
-  rawText: string,
-  speakerMap?: Record<string, string>
-): string {
-  const items = parseTranscriptItems(rawText, speakerMap);
-  if (!items || items.length === 0) return "";
-  return items.map((item) => `${item.speaker}: ${item.text}`).join("\n");
 }

@@ -10,7 +10,7 @@ import { meetingsInsertSchema, meetingsUpdateSchema } from "../../schemas";
 import { MeetingStatus } from "../../types";
 import { streamVideo } from "@/lib/stream-video";
 import { generateAvatarUri } from "@/lib/avatar";
-import { parseTranscriptItems } from "@/inngest/transcript-parser";
+import { parseTranscriptItems } from "@/lib/transcript-parser";
 
 export const meetingsRouter = createTRPCRouter({
 
