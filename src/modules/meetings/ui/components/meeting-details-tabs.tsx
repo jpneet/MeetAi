@@ -44,7 +44,10 @@ export const MeetingDetailsTabs = ({ meeting }: Props) => {
         </TabsContent>
 
         <TabsContent value="recording" className="mt-6">
-          <RecordingTab recordingUrl={meeting.recordingUrl} />
+          <RecordingTab
+            recordingUrl={meeting.recordingUrl}
+            meetingId={meeting.id}
+          />
         </TabsContent>
 
         <TabsContent value="ask-ai" className="mt-6">
