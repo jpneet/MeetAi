@@ -336,7 +336,7 @@ class ConversationalRealtimeLLM(Realtime):
                     llm_res = await loop.run_in_executor(
                         None,
                         lambda: client.models.generate_content(
-                            model="gemini-2.5-flash",
+                            model="gemini-2.0-flash",
                             contents=prompt,
                         ),
                     )
@@ -560,7 +560,7 @@ app = FastAPI(title="Meet AI Vision Agent Service", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
