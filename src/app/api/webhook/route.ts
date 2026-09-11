@@ -143,7 +143,12 @@ export async function POST(req: NextRequest) {
 
       const agentRes = await fetch(`${visionAgentUrl}/join`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(process.env.AGENT_SERVICE_SECRET
+            ? { Authorization: `Bearer ${process.env.AGENT_SERVICE_SECRET}` }
+            : {}),
+        },
         body: JSON.stringify({
           callType: "default",
           callId: meetingId,
