@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { ArrowRightIcon, BotIcon, CalendarIcon, SparklesIcon } from "lucide-react";
+import {
+  ArrowRightIcon,
+  BotIcon,
+  CalendarIcon,
+  SparklesIcon,
+} from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -17,21 +22,24 @@ const cinzelDecorative = Cinzel_Decorative({
   variable: "--font-cinzel-decorative",
 });
 
-
 const bodoniModa = Bodoni_Moda({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-bodoni-moda",
 });
+
 function getGreeting(): string {
   const hour = new Date().getHours();
+
   if (hour < 12) return "Good Morning";
   if (hour < 17) return "Good Afternoon";
+
   return "Good Evening";
 }
 
 export const HomeView = () => {
   const { data: session } = authClient.useSession();
+
   const [meetingDialogOpen, setMeetingDialogOpen] = useState(false);
   const [agentDialogOpen, setAgentDialogOpen] = useState(false);
 
@@ -40,10 +48,19 @@ export const HomeView = () => {
 
   return (
     <>
-      <NewMeetingDialog open={meetingDialogOpen} onOpenChange={setMeetingDialogOpen} />
-      <NewAgentDialog open={agentDialogOpen} onOpenChange={setAgentDialogOpen} />
+      <NewMeetingDialog
+        open={meetingDialogOpen}
+        onOpenChange={setMeetingDialogOpen}
+      />
 
-      <div className="home-view">
+      <NewAgentDialog
+        open={agentDialogOpen}
+        onOpenChange={setAgentDialogOpen}
+      />
+
+      <div
+        className={`home-view ${cinzelDecorative.variable} ${bodoniModa.variable}`}
+      >
         {/* Breadcrumb */}
         <p className="home-view__breadcrumb"></p>
 
@@ -71,7 +88,8 @@ export const HomeView = () => {
             </h2>
 
             <p className="home-hero__description">
-              MeetAI helps you host, understand, and turn every conversation into actionable insights.
+              MeetAI helps you host, understand, and turn every conversation
+              into actionable insights.
             </p>
 
             <div className="home-hero__actions">
@@ -97,39 +115,59 @@ export const HomeView = () => {
 
           {/* Right illustration */}
           <div className="home-hero__illustration">
-            {/* Floating cards */}
+            {/* AI Assistant Card */}
             <div className="home-floating-card home-floating-card--assistant">
               <div className="home-floating-card__indicator home-floating-card__indicator--green" />
+
               <div>
-                <p className="home-floating-card__title">AI Assistant</p>
-                <p className="home-floating-card__subtitle">Ready to help</p>
+                <p className="home-floating-card__title">
+                  AI Assistant
+                </p>
+
+                <p className="home-floating-card__subtitle">
+                  Ready to help
+                </p>
               </div>
             </div>
 
+            {/* Upcoming Meetings Card */}
             <div className="home-floating-card home-floating-card--meetings">
               <div className="home-floating-card__icon-wrapper">
                 <CalendarIcon className="size-3.5 text-[#0094F7]" />
               </div>
+
               <div>
-                <p className="home-floating-card__title">Upcoming Meetings</p>
-                <p className="home-floating-card__subtitle">3 meetings today</p>
+                <p className="home-floating-card__title">
+                  Upcoming Meetings
+                </p>
+
+                <p className="home-floating-card__subtitle">
+                  3 meetings today
+                </p>
               </div>
             </div>
 
+            {/* AI Insights Card */}
             <div className="home-floating-card home-floating-card--insights">
               <div className="home-floating-card__icon-wrapper">
                 <BotIcon className="size-3.5 text-[#0094F7]" />
               </div>
+
               <div>
-                <p className="home-floating-card__title">AI Insights</p>
-                <p className="home-floating-card__subtitle">12 key moments</p>
+                <p className="home-floating-card__title">
+                  AI Insights
+                </p>
+
+                <p className="home-floating-card__subtitle">
+                  12 key moments
+                </p>
               </div>
             </div>
 
             {/* Robot glow */}
             <div className="home-hero__robot-glow" />
 
-            {/* Robot image */}
+            {/* Robot */}
             <Image
               src="/robo.png"
               alt="MeetAI Robot Assistant"
